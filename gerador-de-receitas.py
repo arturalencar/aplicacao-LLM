@@ -8,7 +8,7 @@ config = {
     "provider": "google",
     "model_name": "gemini-2.5-flash",
     "temperature": 0.7,   #Criatividade da IA.
-    "max_tokens": 100000, #Tamanho máximo da receita (Talvez seja melhor diminuir pra um padrão. Tipo 4096).
+    "max_tokens": 5000, #Tamanho máximo da receita (Talvez seja melhor diminuir pra um padrão. Tipo 4096).
     "modality": "text"
 }
 
@@ -40,7 +40,7 @@ def CONVERSATIONAL_AGENT(user_input, history, config):
 
     # Gestão de Contexto (Simplificado aqui)
     # To-do: Implementar a parte do TRUNCATE_HISTORY para gestão de mensagens mais longas (pedido do PDF do prof.)
-    payload = history
+    payload = TRUNCATE_HISTORY(history, limit=4096)
 
     # Chamada da API
     api_response = CALL_LLM_API(config, payload)
@@ -54,14 +54,33 @@ def CONVERSATIONAL_AGENT(user_input, history, config):
 
     return reply_text, history
 
+#quantizacao de tokens para fazer truncamento
+def estimate_tokens(history):
+    total_chars = 0
+    for msg in history:
+        total_chars += len(msg.parts[0].text)
+
+    return total_chars // 4 #quantifica quantos tokens o histórico possui com base nos caracteres.
+
+def TRUNCATE_HISTORY(history, limit=4096):
+
+    while estimate_tokens(history) > limit:
+        history.pop(1)  # remove o mais antigo após system
+
+    return history
 
 # Integrando ao Streamlit
 
 st.title("Gerador de Receitas com Restrições")
 
-# Inicializa a lista (vetor) de histórico
+# Inicializa a lista (vetor) de histórico com o System Prompt fixo
 if "history" not in st.session_state:
-    st.session_state.history = []
+    st.session_state.history = [
+        CREATE_MESSAGE(
+            role="system",
+            content="Você é um chef especialista em receitas adaptadas para restrições alimentares."
+        )
+    ]
 
 
 alergias = st.text_input("Quais são suas alergias?")
@@ -82,3 +101,13 @@ if st.button("Gerar Receita"):
 
         st.subheader("Receita Gerada:")
         st.write(resposta_ia)
+
+
+#Exibe histórico de receitas geradas na interação com o usuário
+with st.expander("Histórico de Receitas"):
+    for msg in st.session_state.history:
+        if msg.role == "system":
+            continue  # não mostra o system prompt
+
+        with st.chat_message("user" if msg.role == "user" else "assistant"):
+            st.write(msg.parts[0].text)
