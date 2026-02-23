@@ -41,8 +41,7 @@ def CONVERSATIONAL_AGENT(user_input, history, config):
     current_msg = CREATE_MESSAGE(role="user", content=user_input)
     history.append(current_msg)
 
-    # Gestão de Contexto (Simplificado aqui)
-    # To-do: Implementar a parte do TRUNCATE_HISTORY para gestão de mensagens mais longas (pedido do PDF do prof.)
+    # Gestão de Contexto:
     payload = TRUNCATE_HISTORY(history, limit=4096)
 
     # Chamada da API
