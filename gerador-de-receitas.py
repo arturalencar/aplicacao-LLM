@@ -8,8 +8,9 @@ config = {
     "provider": "google",
     "model_name": "gemini-2.5-flash",
     "temperature": 0.7,   #Criatividade da IA.
-    "max_tokens": 5000, #Tamanho máximo da receita (Talvez seja melhor diminuir pra um padrão. Tipo 4096).
-    "modality": "text"
+    "max_tokens": 4096,
+    "modality": "text",
+    "system-instruction": "Você é um chef especialista em receitas adaptadas para restrições alimentares."
 }
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -23,7 +24,9 @@ def CALL_LLM_API(config, payload):
     return client.models.generate_content(
         model=config["model_name"],
         contents=payload,
-        config=types.GenerateContentConfig(temperature=config["temperature"])
+        config=types.GenerateContentConfig(
+            temperature=config["temperature"],
+            system_instruction=config.get("system_instruction"))
     )
 
 
@@ -63,24 +66,23 @@ def estimate_tokens(history):
     return total_chars // 4 #quantifica quantos tokens o histórico possui com base nos caracteres.
 
 def TRUNCATE_HISTORY(history, limit=4096):
+    #Usando uma cópia do histórico pra preservar o original:
+    payload = history.copy()
 
-    while estimate_tokens(history) > limit:
-        history.pop(1)  # remove o mais antigo após system
+    while estimate_tokens(history) > limit and len(payload) > 2:
+        #Dois pops pra remover a conversa mais antiga: user_antigo, resposta_antiga
+        payload.pop(0)
+        payload.pop(0)
 
-    return history
+    return payload
 
 # Integrando ao Streamlit
 
 st.title("Gerador de Receitas com Restrições")
 
-# Inicializa a lista (vetor) de histórico com o System Prompt fixo
+# Inicializa a lista (vetor) de histórico
 if "history" not in st.session_state:
-    st.session_state.history = [
-        CREATE_MESSAGE(
-            role="system",
-            content="Você é um chef especialista em receitas adaptadas para restrições alimentares."
-        )
-    ]
+    st.session_state.history = []
 
 
 alergias = st.text_input("Quais são suas alergias?")
@@ -106,8 +108,5 @@ if st.button("Gerar Receita"):
 #Exibe histórico de receitas geradas na interação com o usuário
 with st.expander("Histórico de Receitas"):
     for msg in st.session_state.history:
-        if msg.role == "system":
-            continue  # não mostra o system prompt
-
-        with st.chat_message("user" if msg.role == "user" else "assistant"):
+        with st.chat_message("user" if msg.role == "user" else "model"):
             st.write(msg.parts[0].text)
