@@ -68,7 +68,7 @@ def TRUNCATE_HISTORY(history, limit=4096):
     #Usando uma cópia do histórico pra preservar o original:
     payload = history.copy()
 
-    while estimate_tokens(history) > limit and len(payload) > 2:
+    while estimate_tokens(payload) > limit and len(payload) > 2:
         #Dois pops pra remover a conversa mais antiga: user_antigo, resposta_antiga
         payload.pop(0)
         payload.pop(0)
